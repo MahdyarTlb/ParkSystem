@@ -3,13 +3,15 @@
 
 using namespace std;
 
-// 1. سازنده (Constructor)
+int Simulator::totalWaitTime = 0;
+int Simulator::totalVisitorsServed = 0;
+
+// Constructor
 Simulator::Simulator() {
     currentTime = 0;
     totalRides = 0;
 }
 
-// 2. پیدا کردن دستگاه
 Ride* Simulator::findRide(string name) {
     for (int i = 0; i < totalRides; i++) {
         if (rides[i].name == name) return &rides[i];
@@ -17,7 +19,6 @@ Ride* Simulator::findRide(string name) {
     return nullptr;
 }
 
-// 3. نمایش افراد در حال بازی
 void Simulator::displayCurrentlyServing(string rideName) {
     Ride* r = findRide(rideName);
     if (r) {
@@ -25,7 +26,6 @@ void Simulator::displayCurrentlyServing(string rideName) {
     }
 }
 
-// 4. اضافه کردن دستگاه
 void Simulator::addRide(string name, int capacity, int duration) {
     if (totalRides < 10) {
         rides[totalRides] = Ride(name, capacity, duration);
@@ -33,29 +33,37 @@ void Simulator::addRide(string name, int capacity, int duration) {
     }
 }
 
-// 5. اضافه کردن بازدیدکننده
-void Simulator::addVisitor(int id, string name, string type) {
-    VisitorType vType = (type == "VIP") ? VIP : NORMAL;
-    Visitor* newVisitor = new Visitor(id, name, vType, currentTime);
+void Simulator::addVisitor(int id, string name, int patience) {
+    Visitor* newVisitor = new Visitor(id, name, NORMAL, currentTime, patience);
     visitors.addVisitor(newVisitor);
     cout << "Visitor " << name << " (ID: " << id << ") added to the park." << endl;
 }
 
-// 6. پیوستن به صف
 void Simulator::joinQueue(int id, string rideName) {
     Visitor* v = visitors.findVisitor(id);
     Ride* r = findRide(rideName);
+    if (v->isBusy) {
+        cout << "Error: Visitor " << v->name << " is already in a queue or ride!" << endl;
+        return;
+    }
+
     if (v && r) {
         r->queue.enqueue(v);
+        v->enterQueueTime = currentTime;
+        v->isBusy = true;
         cout << v->name << " joined " << r->name << " queue." << endl;
     }
 }
 
-// 7. موتور اصلی شبیه‌ساز
 void Simulator::tick(int minutes) {
     for (int m = 0; m < minutes; m++) {
         currentTime++;
-        
+
+        for (int i = 0; i < totalRides; i++) {
+            Ride& r = rides[i];
+            r.queue.removeImpatient(currentTime); //remove impatient
+        }
+
         while (!eventHeap.empty() && eventHeap.top().timestamp <= currentTime) {
             Event currentEvent = eventHeap.top();
             eventHeap.pop();
@@ -66,17 +74,26 @@ void Simulator::tick(int minutes) {
                     r->currentlyServing--;
                     r->processedCount++;
                     r->servingNow.leaveQueue(currentEvent.visitorId);
+                    Visitor* v = visitors.findVisitor(currentEvent.visitorId);
+
+                    if (v) v->isBusy = false; // free player
+
                     cout << "At time " << currentTime << ": Visitor " << currentEvent.visitorId 
                          << " finished " << r->name << endl;
                 }
             }
         }
 
-        for (int i = 0; i < totalRides; i++) {
+        for(int i = 0; i < totalRides; i++) {
             Ride& r = rides[i];
             while (r.currentlyServing < r.capacity) {
                 Visitor* nextV = r.queue.dequeue();
                 if (!nextV) break;
+
+                int wait = currentTime - nextV->enterQueueTime;
+                Simulator::totalWaitTime += wait;
+                Simulator::totalVisitorsServed++;
+
                 r.currentlyServing++;
                 r.servingNow.enqueue(nextV);
                 
@@ -91,13 +108,12 @@ void Simulator::tick(int minutes) {
     }
 }
 
-// 8. گزارش وضعیت
 void Simulator::status() {
     cout << "--- STATUS REPORT ---" << endl;
     for (int i = 0; i < totalRides; i++) {
         Ride& r = rides[i];
         cout << " * Queue " << r.name << ": [";
-        r.queue.display(); // لینک‌لیست باید ID و اولویت را چاپ کند
+        r.queue.display();
         cout << "]" << endl;
         
         cout << " * Ride " << r.name << ": Serving [";
@@ -108,15 +124,24 @@ void Simulator::status() {
     cout << "---------------------" << endl;
 }
 
-// 9. گزارش نهایی
 void Simulator::report() {
     cout << "--- FINAL REPORT ---" << endl;
     for (int i = 0; i < totalRides; i++) {
         cout << " * " << rides[i].name << " Total Served: " << rides[i].processedCount << endl;
+        cout << "   - Remaining in Queue: [";
+        rides[i].queue.display(); 
+        cout << "]" << endl;
     }
+
+    if (Simulator::totalVisitorsServed > 0) {
+        double avgWait = (double)Simulator::totalWaitTime / Simulator::totalVisitorsServed;
+        cout << " * Average Wait Time in Park: " << avgWait << " minutes." << endl;
+    } else {
+        cout << " * Average Wait Time in Park: 0 minutes." << endl;
+    }
+    cout << "---------------------" << endl;
 }
 
-// ۱. نمایش اطلاعات بازدیدکننده
 void Simulator::visitorInfo(int id) {
     Visitor* v = visitors.findVisitor(id);
     if (!v) { cout << "Visitor not found!" << endl; return; }
@@ -128,21 +153,20 @@ void Simulator::visitorInfo(int id) {
     }
 
     cout << "Name: " << v->name << " | Type: " << (v->type == VIP ? "VIP" : "Normal") 
-         << " | Location: " << location << endl; // [cite: 129, 130]
+         << " | Location: " << location << endl;
 }
 
-// ۲. تبدیل به VIP
 void Simulator::makeVip(int id) {
     Visitor* v = visitors.findVisitor(id);
     if (!v) return;
 
-    v->type = VIP; // تغییر لیبل [cite: 131]
+    v->type = VIP;
 
-    // چک کردن تمام صف‌ها برای جابجایی جایگاه فرد [cite: 132]
+    // check all of queues for changing priority
     for (int i = 0; i < totalRides; i++) {
-        if (rides[i].queue.exists(id)) { // اگر در این صف بود
-            rides[i].queue.leaveQueue(id); // حذف از جایگاه قبلی
-            rides[i].queue.enqueue(v);    // درج مجدد در جایگاه جدید (طلایی)
+        if (rides[i].queue.exists(id)) {
+            rides[i].queue.leaveQueue(id); // left last rank
+            rides[i].queue.enqueue(v);    // new rank
         }
     }
     cout << v->name << " is now VIP and moved forward in queues." << endl;
@@ -150,22 +174,42 @@ void Simulator::makeVip(int id) {
 
 void Simulator::leaveQueue(int id, string rideName) {
     Ride* r = findRide(rideName);
-    if (r) {
-        r->queue.leaveQueue(id); // حذف از لیست پیوندی 
+    Visitor* v = visitors.findVisitor(id);
+
+    if (!v || !r) {
+        cout << "Visitor or Ride not found!" << endl;
+        return;
+    }
+
+    // ۱is busy
+    if (!v->isBusy) {
+        cout << "Visitor " << id << " is not in any queue or ride!" << endl;
+        return;
+    }
+
+    // is serving?
+    if (r->servingNow.exists(id)) {
+        cout << "Error: Visitor " << id << " is currently on the " << rideName << " and cannot leave!" << endl;
+        return;
+    }
+
+    // is in the queue
+    if (r->queue.exists(id)) {
+        r->queue.leaveQueue(id);
+        v->isBusy = false; // free
         cout << "Visitor " << id << " left the queue of " << rideName << "." << endl;
+    } else {
+        cout << "Visitor " << id << " is not in the queue of " << rideName << " (maybe in another ride?)" << endl;
     }
 }
 
-// ۳. حذف بازدیدکننده (نیاز به حذف از AVL و صف‌ها دارد)
 void Simulator::deleteVisitor(int id) {
-    // ۱. حذف از صف انتظار تمام دستگاه‌ها
+    // delete from rides queue
     for (int i = 0; i < totalRides; i++) {
         rides[i].queue.leaveQueue(id);
-        rides[i].servingNow.leaveQueue(id); // اگر داخل دستگاه بود هم حذف شود
+        rides[i].servingNow.leaveQueue(id); // remove if riding
     }
     
-    // ۲. حذف از درخت AVL (آپدیت ریشه درخت)
-    // فرض می‌کنیم ریشه درخت در کلاس AVLTree خصوصی است، پس یک متد عمومی بساز
     visitors.removeFromTree(id); 
 
     cout << "Visitor " << id << " has been completely removed from the system." << endl;

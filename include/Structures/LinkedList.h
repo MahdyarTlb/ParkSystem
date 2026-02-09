@@ -88,7 +88,7 @@ class RideQueue{
         Node* temp = head;
         
         while(temp){
-            std::cout<< temp->visitor->id << (temp->visitor->type == VIP ? "\tVIP" : "\t   ") << temp->visitor->name << "\t p: " << temp->visitor->patience;
+            std::cout<< temp->visitor->id << (temp->visitor->type == VIP ? "   (VIP)" : "  ") << temp->visitor->name << "  p: " << temp->visitor->patience << ", ";
             temp = temp->next;
         }
     }
@@ -100,6 +100,20 @@ class RideQueue{
             temp = temp->next;
         }
         return false;
+    }
+
+    void removeImpatient(int now) {
+        Node* curr = head;
+        while (curr) {
+            Node* nextNode = curr->next;
+            if (now - curr->visitor->enterQueueTime > curr->visitor->patience) {
+                cout << "Visitor " << curr->visitor->name << " lost patience and left!" << endl;
+                int idToLeave = curr->visitor->id;
+                curr->visitor->isBusy = false; // free
+                leaveQueue(idToLeave); // remove from list
+            }
+            curr = nextNode;
+        }
     }
 };
 #endif

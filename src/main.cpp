@@ -13,9 +13,9 @@ int main() {
 
     while (cin >> command) {
         if (command == "ADD_VISITOR") {
-            int id; string name, type;
-            cin >> id >> name >> type;
-            sim.addVisitor(id, name, type);
+            int id, patience; string name;
+            cin >> id >> name >> patience;
+            sim.addVisitor(id, name, patience);
         } else if (command == "JOIN_QUEUE") {
             int id; string ride;
             cin >> id >> ride;

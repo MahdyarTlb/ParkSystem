@@ -18,13 +18,18 @@ class Visitor{
     VisitorType type;
     int arrivalTime;
     int patience;
+    int enterQueueTime;
+    static int totalWaitTime; 
+    static int totalVisitorsServed;
+    bool isBusy;
 
-    Visitor(int _id, string _name, VisitorType _type, int _time){
+    Visitor(int _id, string _name, VisitorType _type, int _time, int _patience = 10){ // default patience is 10 min
         id = _id;
         name = _name;
         type = _type;
         arrivalTime = _time;
-        patience = 100; // default patience
+        patience = _patience;
+        isBusy = false; //default isnot busy
     }
 };
 

@@ -9,17 +9,19 @@
 class Simulator {
 private:
     AVLTree visitors;
-    Ride rides[10]; // مثلاً آرایه‌ای از دستگاه‌ها
+    Ride rides[10]; // array of rides
     int totalRides;
     MinHeap eventHeap;
     int currentTime;
+    static int totalWaitTime;
+    static int totalVisitorsServed;
 
     Ride* findRide(std::string name);
     void displayCurrentlyServing(std::string rideName);
 
 public:
-    Simulator(); // سازنده
-    void addVisitor(int id, std::string name, std::string type);
+    Simulator(); // constructor
+    void addVisitor(int id, std::string name, int patience);
     void joinQueue(int id, std::string rideName);
     void addRide(std::string name, int capacity, int duration);
     void visitorInfo(int id);
