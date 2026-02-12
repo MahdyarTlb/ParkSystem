@@ -40,6 +40,8 @@ int main() {
             int id; string rideName;
             cin >> id >> rideName;
             sim.leaveQueue(id, rideName);
+        } else if (command == "UNDO") {
+            sim.undo();
         }
     }
     return 0;

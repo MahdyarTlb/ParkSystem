@@ -7,7 +7,7 @@ int Simulator::totalWaitTime = 0;
 int Simulator::totalVisitorsServed = 0;
 
 // Constructor
-Simulator::Simulator() {
+Simulator::Simulator(): undoStack(100) { 
     currentTime = 0;
     totalRides = 0;
 }
@@ -37,6 +37,8 @@ void Simulator::addVisitor(int id, string name, int patience) {
     Visitor* newVisitor = new Visitor(id, name, NORMAL, currentTime, patience);
     visitors.addVisitor(newVisitor);
     cout << "Visitor " << name << " (ID: " << id << ") added to the park." << endl;
+
+    undoStack.push({ADD_V, id, ""}); // push to the stack
 }
 
 void Simulator::joinQueue(int id, string rideName) {
@@ -53,6 +55,8 @@ void Simulator::joinQueue(int id, string rideName) {
         v->isBusy = true;
         cout << v->name << " joined " << r->name << " queue." << endl;
     }
+
+    undoStack.push({JOIN_Q, id, rideName});
 }
 
 void Simulator::tick(int minutes) {
@@ -170,6 +174,8 @@ void Simulator::makeVip(int id) {
         }
     }
     cout << v->name << " is now VIP and moved forward in queues." << endl;
+
+    undoStack.push({MAKE_V_VIP, id, ""});
 }
 
 void Simulator::leaveQueue(int id, string rideName) {
@@ -201,6 +207,8 @@ void Simulator::leaveQueue(int id, string rideName) {
     } else {
         cout << "Visitor " << id << " is not in the queue of " << rideName << " (maybe in another ride?)" << endl;
     }
+
+    undoStack.push({LEAVE_Q_ACTION, id, rideName});
 }
 
 void Simulator::deleteVisitor(int id) {
@@ -210,7 +218,71 @@ void Simulator::deleteVisitor(int id) {
         rides[i].servingNow.leaveQueue(id); // remove if riding
     }
     
-    visitors.removeFromTree(id); 
+    if (visitors.findVisitor(id)) {
 
-    cout << "Visitor " << id << " has been completely removed from the system." << endl;
+        visitors.removeFromTree(id); 
+
+        cout << "Visitor " << id << " has been completely removed from the system." << endl;
+
+    } else {
+
+        cout << "No one has " << id << " id to remove!" << endl;
+        
+    }
+}
+
+void Simulator::undo() {
+    if (undoStack.isEmpty()) {
+        cout << "Nothing to undo!" << endl;
+        return;
+    }
+
+    UndoAction last = undoStack.pop();
+    cout << "Undoing action... ";
+
+    switch (last.type) {
+        case ADD_V: {
+            // معکوسِ اضافه کردن -> حذف از درخت
+            // دقت کن که باید از تمام صف‌ها هم پاک بشه (مثل deleteVisitor)
+            deleteVisitor(last.visitorId); 
+            cout << "Visitor " << last.visitorId << " removed." << endl;
+            break;
+        }
+        case JOIN_Q: {
+            // معکوسِ وارد صف شدن -> خارج شدن از صف
+            Ride* r = findRide(last.rideName);
+            if (r) {
+                r->queue.leaveQueue(last.visitorId);
+                Visitor* v = visitors.findVisitor(last.visitorId);
+                if (v) v->isBusy = false;
+                cout << "Visitor " << last.visitorId << " removed from " << last.rideName << " queue." << endl;
+            }
+            break;
+        }
+        case MAKE_V_VIP: {
+            // معکوسِ VIP شدن -> برگشت به NORMAL
+            Visitor* v = visitors.findVisitor(last.visitorId);
+            if (v) {
+                v->type = NORMAL;
+                // نکته حرفه‌ای: برای برگردوندن جایگاهش در صف، باید یک بار از صف در بیاد و دوباره بره تو
+                for (int i = 0; i < totalRides; i++) {
+                    if (rides[i].queue.exists(v->id)) {
+                        rides[i].queue.leaveQueue(v->id);
+                        rides[i].queue.enqueue(v); // چون الان Normal شده، میره آخر صف
+                    }
+                }
+                cout << "Visitor " << last.visitorId << " is now NORMAL again." << endl;
+            }
+            break;
+        }
+        case LEAVE_Q_ACTION: {
+            // معکوسِ انصراف از صف -> دوباره وارد صف شدن
+            Visitor* v = visitors.findVisitor(last.visitorId);
+            if (v) {
+                joinQueue(v->id, last.rideName); // دوباره میره تو صف
+                cout << "Visitor " << last.visitorId << " returned to " << last.rideName << " queue." << endl;
+            }
+            break;
+        }
+    }
 }

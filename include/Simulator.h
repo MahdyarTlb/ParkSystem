@@ -4,10 +4,12 @@
 #include "models/Ride.h"
 #include "structures/AVLTree.h"
 #include "structures/MinHeap.h"
+#include "structures/Stack.h"
 #include <string>
 
 class Simulator {
 private:
+    UndoStack undoStack;
     AVLTree visitors;
     Ride rides[10]; // array of rides
     int totalRides;
@@ -31,6 +33,7 @@ public:
     void tick(int minutes);
     void status();
     void report();
+    void undo();
 };
 
 #endif
