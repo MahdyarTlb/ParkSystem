@@ -143,11 +143,25 @@ class AVLTree{
         return root;
     }
 
+    void saveRecursive(AVLNode* node, ostream& out) {
+        if (!node) return;
+        // فرمت: VISITOR ID NAME PATIENCE
+        out << "VISITOR " << node->visitor->id << " " << node->visitor->name 
+            << " " << node->visitor->patience << endl;
+        saveRecursive(node->left, out);
+        saveRecursive(node->right, out);
+    }
+    
 public:
     AVLTree() : root(nullptr) {}
     void addVisitor(Visitor* v) { root = insert(root, v); }
     Visitor* findVisitor(int id) { return search(root, id); }
     void removeFromTree(int id) { root = remove(root, id); }
+    void saveToStream(ostream& out) {
+        saveRecursive(root, out);
+    }
 };
+
+
 
 #endif

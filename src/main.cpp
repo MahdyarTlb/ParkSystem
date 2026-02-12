@@ -42,6 +42,12 @@ int main() {
             sim.leaveQueue(id, rideName);
         } else if (command == "UNDO") {
             sim.undo();
+        } else if (command == "SAVE") {
+            string fileName; cin >> fileName;
+            sim.saveSystemState(fileName);
+        } else if (command == "LOAD") {
+            string fileName; cin >> fileName;
+            sim.loadSystemState(fileName);
         }
     }
     return 0;

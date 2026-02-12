@@ -115,5 +115,45 @@ class RideQueue{
             curr = nextNode;
         }
     }
+
+    void saveToStream(ostream& out) {
+        Node* temp = head;
+        while (temp) {
+            out << temp->visitor->id << " ";
+            temp = temp->next;
+        }
+    }
 };
+
+// for save in a file
+struct LogNode {
+    string message;
+    LogNode* next;
+};
+
+class LogManager {
+private:
+    LogNode* head;
+    LogNode* tail;
+public:
+    LogManager() : head(nullptr), tail(nullptr) {}
+
+    void addLog(string msg, int time) {
+        LogNode* newNode = new LogNode{ "T=" + to_string(time) + ": " + msg, nullptr };
+        if (!head) head = tail = newNode;
+        else {
+            tail->next = newNode;
+            tail = newNode;
+        }
+    }
+
+    void printAll(ostream& out) {
+    LogNode* temp = head;
+    while (temp) {
+        out << "  - " << temp->message << endl;
+        temp = temp->next;
+    }
+}
+};
+
 #endif

@@ -1,0 +1,4 @@
+TIME 0
+VISITOR 1 ali 5
+RIDE_QUEUE Jet 1 
+RIDE_QUEUE Wheel 

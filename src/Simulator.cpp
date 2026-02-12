@@ -1,5 +1,7 @@
 #include "../include/Simulator.h"
 #include <iostream>
+#include <fstream>
+#include <sstream>
 
 using namespace std;
 
@@ -41,7 +43,7 @@ void Simulator::addVisitor(int id, string name, int patience) {
     undoStack.push({ADD_V, id, ""}); // push to the stack
 }
 
-void Simulator::joinQueue(int id, string rideName) {
+void Simulator::joinQueue(int id, string rideName, int p) {
     Visitor* v = visitors.findVisitor(id);
     Ride* r = findRide(rideName);
     if (v->isBusy) {
@@ -51,6 +53,7 @@ void Simulator::joinQueue(int id, string rideName) {
 
     if (v && r) {
         r->queue.enqueue(v);
+        v->patience = p;
         v->enterQueueTime = currentTime;
         v->isBusy = true;
         cout << v->name << " joined " << r->name << " queue." << endl;
@@ -144,6 +147,8 @@ void Simulator::report() {
         cout << " * Average Wait Time in Park: 0 minutes." << endl;
     }
     cout << "---------------------" << endl;
+
+    saveSystemState("final_report.txt"); // save in a file
 }
 
 void Simulator::visitorInfo(int id) {
@@ -227,7 +232,7 @@ void Simulator::deleteVisitor(int id) {
     } else {
 
         cout << "No one has " << id << " id to remove!" << endl;
-        
+
     }
 }
 
@@ -285,4 +290,82 @@ void Simulator::undo() {
             break;
         }
     }
+}
+
+void Simulator::saveSystemState(string fileName) {
+    ofstream outFile(fileName);
+    if (!outFile) return;
+
+    outFile << "TIME " << currentTime << endl;
+
+    // ۱. ذخیره همه بازدیدکننده‌ها
+    visitors.saveToStream(outFile); 
+
+    // ۲. ذخیره وضعیت دستگاه‌ها
+    for (int i = 0; i < totalRides; i++) {
+        // الف) ذخیره افرادی که سوار هستند
+        outFile << "RIDE_SERVING " << rides[i].name << " ";
+        rides[i].servingNow.saveToStream(outFile); 
+        outFile << endl;
+
+        // ب) ذخیره افرادی که در صف انتظار هستند
+        outFile << "RIDE_QUEUE " << rides[i].name << " ";
+        rides[i].queue.saveToStream(outFile); 
+        outFile << endl;
+    }
+
+    outFile.close();
+    cout << "Deep Save Completed (Including Serving Visitors)." << endl;
+}
+
+void Simulator::loadSystemState(string fileName) {
+    ifstream inFile(fileName);
+    if (!inFile) {
+        cout << "Error: Backup file not found!" << endl;
+        return;
+    }
+
+    string cmd;
+    while (inFile >> cmd) {
+        if (cmd == "TIME") {
+            inFile >> currentTime;
+        } 
+        else if (cmd == "VISITOR") {
+            int id, p; string name;
+            inFile >> id >> name >> p;
+            addVisitor(id, name, p);
+        }
+        else if (cmd == "RIDE_QUEUE" || cmd == "RIDE_SERVING") {
+        string type = cmd;
+        string rideName;
+        inFile >> rideName;
+        Ride* r = findRide(rideName);
+        
+        string line;
+        getline(inFile, line);
+        stringstream ss(line);
+        int vId;
+        while (ss >> vId) {
+            Visitor* v = visitors.findVisitor(vId);
+            if (v && r) {
+                v->isBusy = true;
+                if (type == "RIDE_QUEUE") {
+                    r->queue.enqueue(v);
+                } else {
+                    r->servingNow.enqueue(v);
+                    r->currentlyServing++;
+                    // اضافه کردن به Heap
+                    Event finishEvent;
+                    finishEvent.timestamp = currentTime + r->duration;
+                    finishEvent.visitorId = vId;
+                    finishEvent.rideName = r->name;
+                    finishEvent.type = RIDE_FINISHED;
+                    eventHeap.push(finishEvent);
+                }
+            }
+        }
+    }
+    }
+    inFile.close();
+    cout << "--- System Restored Successfully at T=" << currentTime << " ---" << endl;
 }
