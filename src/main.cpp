@@ -48,6 +48,18 @@ int main() {
         } else if (command == "LOAD") {
             string fileName; cin >> fileName;
             sim.loadSystemState(fileName);
+        } else if (command == "FAMILY_JOIN") {
+            string rideName;
+            int count, patience;
+            cin >> rideName >> count >> patience;
+
+            int* ids = new int[count];
+            for (int i = 0; i < count; i++) {
+                cin >> ids[i];
+            }
+
+            sim.joinFamily(ids, count, rideName, patience);
+            delete[] ids;
         }
     }
     return 0;

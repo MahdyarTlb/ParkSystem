@@ -38,12 +38,12 @@ void Simulator::addRide(string name, int capacity, int duration) {
 void Simulator::addVisitor(int id, string name, int patience) {
     Visitor* newVisitor = new Visitor(id, name, NORMAL, currentTime, patience);
     visitors.addVisitor(newVisitor);
-    cout << "Visitor " << name << " (ID: " << id << ") added to the park." << endl;
+    cout << "Visitor " << name << " (ID: " << id << ") (patience:" << patience << ") added to the park." << endl;
 
     undoStack.push({ADD_V, id, ""}); // push to the stack
 }
 
-void Simulator::joinQueue(int id, string rideName, int p) {
+void Simulator::joinQueue(int id, string rideName) {
     Visitor* v = visitors.findVisitor(id);
     Ride* r = findRide(rideName);
     if (v->isBusy) {
@@ -53,7 +53,6 @@ void Simulator::joinQueue(int id, string rideName, int p) {
 
     if (v && r) {
         r->queue.enqueue(v);
-        v->patience = p;
         v->enterQueueTime = currentTime;
         v->isBusy = true;
         cout << v->name << " joined " << r->name << " queue." << endl;
@@ -63,6 +62,11 @@ void Simulator::joinQueue(int id, string rideName, int p) {
 }
 
 void Simulator::tick(int minutes) {
+    // با گذر زمان نمیشه به غقب برگشت
+    while (!undoStack.isEmpty()) {
+        undoStack.pop(); 
+    }
+
     for (int m = 0; m < minutes; m++) {
         currentTime++;
 
@@ -248,7 +252,6 @@ void Simulator::undo() {
     switch (last.type) {
         case ADD_V: {
             // معکوسِ اضافه کردن -> حذف از درخت
-            // دقت کن که باید از تمام صف‌ها هم پاک بشه (مثل deleteVisitor)
             deleteVisitor(last.visitorId); 
             cout << "Visitor " << last.visitorId << " removed." << endl;
             break;
@@ -256,11 +259,13 @@ void Simulator::undo() {
         case JOIN_Q: {
             // معکوسِ وارد صف شدن -> خارج شدن از صف
             Ride* r = findRide(last.rideName);
-            if (r) {
+            if (r && r->queue.exists(last.visitorId)) {
                 r->queue.leaveQueue(last.visitorId);
                 Visitor* v = visitors.findVisitor(last.visitorId);
                 if (v) v->isBusy = false;
                 cout << "Visitor " << last.visitorId << " removed from " << last.rideName << " queue." << endl;
+            } else {
+                cout << "Undo ignored: Visitor is no longer in the queue (already served or left)." << endl;
             }
             break;
         }
@@ -269,11 +274,10 @@ void Simulator::undo() {
             Visitor* v = visitors.findVisitor(last.visitorId);
             if (v) {
                 v->type = NORMAL;
-                // نکته حرفه‌ای: برای برگردوندن جایگاهش در صف، باید یک بار از صف در بیاد و دوباره بره تو
                 for (int i = 0; i < totalRides; i++) {
                     if (rides[i].queue.exists(v->id)) {
                         rides[i].queue.leaveQueue(v->id);
-                        rides[i].queue.enqueue(v); // چون الان Normal شده، میره آخر صف
+                        rides[i].queue.enqueue(v);
                     }
                 }
                 cout << "Visitor " << last.visitorId << " is now NORMAL again." << endl;
@@ -281,10 +285,9 @@ void Simulator::undo() {
             break;
         }
         case LEAVE_Q_ACTION: {
-            // معکوسِ انصراف از صف -> دوباره وارد صف شدن
             Visitor* v = visitors.findVisitor(last.visitorId);
             if (v) {
-                joinQueue(v->id, last.rideName); // دوباره میره تو صف
+                joinQueue(v->id, last.rideName);
                 cout << "Visitor " << last.visitorId << " returned to " << last.rideName << " queue." << endl;
             }
             break;
@@ -298,17 +301,13 @@ void Simulator::saveSystemState(string fileName) {
 
     outFile << "TIME " << currentTime << endl;
 
-    // ۱. ذخیره همه بازدیدکننده‌ها
     visitors.saveToStream(outFile); 
 
-    // ۲. ذخیره وضعیت دستگاه‌ها
     for (int i = 0; i < totalRides; i++) {
-        // الف) ذخیره افرادی که سوار هستند
         outFile << "RIDE_SERVING " << rides[i].name << " ";
         rides[i].servingNow.saveToStream(outFile); 
         outFile << endl;
 
-        // ب) ذخیره افرادی که در صف انتظار هستند
         outFile << "RIDE_QUEUE " << rides[i].name << " ";
         rides[i].queue.saveToStream(outFile); 
         outFile << endl;
@@ -354,7 +353,6 @@ void Simulator::loadSystemState(string fileName) {
                 } else {
                     r->servingNow.enqueue(v);
                     r->currentlyServing++;
-                    // اضافه کردن به Heap
                     Event finishEvent;
                     finishEvent.timestamp = currentTime + r->duration;
                     finishEvent.visitorId = vId;
@@ -368,4 +366,29 @@ void Simulator::loadSystemState(string fileName) {
     }
     inFile.close();
     cout << "--- System Restored Successfully at T=" << currentTime << " ---" << endl;
+}
+
+void Simulator::joinFamily(int ids[], int count, string rideName, int p) {
+    Ride* r = findRide(rideName);
+    if (!r) return;
+
+    cout << "Family Join Attempt for " << rideName << ":" << endl;
+
+    for (int i = 0; i < count; i++) {
+        Visitor* v = visitors.findVisitor(ids[i]);
+        if (v) {
+            if (v->isBusy) {
+                cout << " - Skip: " << v->name << " is already busy!" << endl;
+                continue;
+            }
+            v->isBusy = true;
+            v->patience = p;
+            v->enterQueueTime = currentTime;
+            
+            r->queue.enqueue(v);
+            cout << " - " << v->name << " added to queue." << endl;
+            
+            undoStack.push({JOIN_Q, v->id, rideName});
+        }
+    }
 }

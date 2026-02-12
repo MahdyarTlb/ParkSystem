@@ -24,7 +24,7 @@ private:
 public:
     Simulator(); // constructor
     void addVisitor(int id, std::string name, int patience);
-    void joinQueue(int id, std::string rideName, int p = 5);
+    void joinQueue(int id, std::string rideName);
     void addRide(std::string name, int capacity, int duration);
     void visitorInfo(int id);
     void makeVip(int id);
@@ -36,6 +36,7 @@ public:
     void undo();
     void loadSystemState(string fileName);
     void saveSystemState(string fileName);
+    void joinFamily(int ids[], int count, string rideName, int p);
 };
 
 #endif
