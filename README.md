@@ -1,6 +1,6 @@
 # 🎢 Theme Park Management System (Data Structures Final Project)
 
-![image](docs/b.png)
+<img src="docs/b.png" alt="Project Logic" width="500">
 
 This project is a high-performance park simulator developed for the **Data Structures & Algorithms** course (Winter 2026). 
 
