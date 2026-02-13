@@ -1,6 +1,6 @@
-![image](docs/b.png)
-
 # 🎢 Theme Park Management System (Data Structures Final Project)
+
+![image](docs/b.png)
 
 This project is a high-performance park simulator developed for the **Data Structures & Algorithms** course (Winter 2026). 
 
